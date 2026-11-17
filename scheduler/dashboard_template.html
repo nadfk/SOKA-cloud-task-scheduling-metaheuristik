@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard Penjadwalan Task Cloud: BFO vs VNS</title>
+<style>
+:root{
+  --bg:#f8fafc;--panel:#ffffff;--ink:#0f172a;--mute:#64748b;--line:#e2e8f0;--grid:#f1f5f9;
+  --bfo:#10b981;--vns:#3b82f6;--focus:#2563eb;--card-bg:#ffffff;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0b1120;--panel:#1e293b;--ink:#f8fafc;--mute:#94a3b8;--line:#334155;--grid:#1e293b;
+    --bfo:#34d399;--vns:#60a5fa;--focus:#60a5fa;--card-bg:#162032;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.55}
+main{max-width:1100px;margin:0 auto;padding:36px 20px 60px}
+.header{margin-bottom:24px}
+.badge{display:inline-block;padding:4px 10px;border-radius:999px;font-size:0.75rem;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;background:#e0e7ff;color:#3730a3;margin-bottom:8px}
+@media (prefers-color-scheme:dark){.badge{background:#312e81;color:#c7d2fe}}
+h1{font-size:clamp(1.6rem,3.2vw,2.2rem);margin:0;font-weight:800;letter-spacing:-0.02em}
+.sub{color:var(--mute);margin:6px 0 0;font-size:0.95rem}
+
+/* KPI Cards */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin:24px 0}
+.kpi-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;box-shadow:0 1px 3px rgba(0,0,0,0.04);position:relative;overflow:hidden}
+.kpi-card::before{content:"";position:absolute;top:0;left:0;right:0;height:4px}
+.kpi-card.bfo-lead::before{background:var(--bfo)}
+.kpi-card.vns-lead::before{background:var(--vns)}
+.kpi-label{font-size:0.82rem;font-weight:600;color:var(--mute);text-transform:uppercase;letter-spacing:0.03em}
+.kpi-value{font-size:1.8rem;font-weight:800;margin:6px 0 2px;letter-spacing:-0.02em}
+.kpi-sub{font-size:0.84rem;color:var(--mute);display:flex;align-items:center;gap:6px}
+.pill{display:inline-block;padding:2px 7px;border-radius:6px;font-size:0.75rem;font-weight:700}
+.pill-bfo{background:#d1fae5;color:#065f46}
+.pill-vns{background:#dbeafe;color:#1e40af}
+
+.verdict-box{background:linear-gradient(135deg,rgba(16,185,129,0.08),rgba(59,130,246,0.08));border:1px solid var(--line);border-radius:14px;padding:18px 22px;margin-bottom:24px}
+.verdict-title{font-size:0.85rem;font-weight:700;color:var(--mute);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px}
+.verdict-text{font-size:1.15rem;font-weight:600;line-height:1.4;margin:0}
+
+.chips{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0 22px}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:999px;border:1.5px solid var(--line);background:var(--panel);color:var(--ink);font:inherit;font-size:0.9rem;font-weight:600;cursor:pointer;transition:all 0.15s ease}
+.chip i{width:12px;height:12px;border-radius:50%;background:var(--c)}
+.chip[aria-pressed=false]{opacity:0.45;border-color:var(--line)}
+.chip[aria-pressed=false] i{background:transparent;box-shadow:inset 0 0 0 2px var(--c)}
+.chip[aria-pressed=true]{border-color:var(--c);box-shadow:0 2px 6px rgba(0,0,0,0.06)}
+
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px;margin-bottom:22px;box-shadow:0 1px 3px rgba(0,0,0,0.03)}
+.head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.head h2{font-size:1.15rem;margin:0;font-weight:700}
+.note{color:var(--mute);font-size:0.86rem}
+.seg{display:inline-flex;border:1.5px solid var(--line);border-radius:9px;overflow:hidden;background:var(--panel)}
+.seg button{border:0;background:transparent;color:var(--mute);padding:6px 14px;font:inherit;font-size:0.85rem;font-weight:600;cursor:pointer;transition:background 0.15s}
+.seg button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+
+.chart{position:relative}
+svg{display:block;width:100%;height:auto;overflow:visible}
+.ax{fill:var(--mute);font-size:11px;font-family:inherit}
+.gl{stroke:var(--grid);stroke-width:1.2}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);padding:8px 12px;border-radius:8px;font-size:0.82rem;line-height:1.45;white-space:nowrap;opacity:0;transition:opacity 0.12s;box-shadow:0 6px 18px rgba(0,0,0,0.2);z-index:10}
+.tip b{display:block;margin-bottom:4px;border-bottom:1px solid rgba(255,255,255,0.15);padding-bottom:2px}
+.tip span{display:flex;align-items:center;gap:6px;margin:2px 0}
+.tip i{width:8px;height:8px;border-radius:50%}
+.grow{transform-box:fill-box;transform-origin:bottom;animation:gr 0.6s ease-out both}
+@keyframes gr{from{transform:scaleY(0)}}
+
+table{width:100%;border-collapse:collapse;font-size:0.92rem;font-variant-numeric:tabular-nums}
+th,td{padding:12px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th button{all:unset;cursor:pointer;color:var(--mute);font-weight:700}
+th button:hover{color:var(--ink)}
+td.best{font-weight:700;color:#059669}
+td.best::after{content:" ✓ (Unggul)";font-size:0.75rem;margin-left:4px;opacity:0.85}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px}
+.wrap{overflow-x:auto}
+
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px}
+.brow{display:grid;grid-template-columns:140px 1fr 65px;gap:12px;align-items:center;margin:10px 0;font-size:0.9rem}
+.bar{height:24px;background:var(--grid);border-radius:6px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;border-radius:6px;transition:width 0.6s cubic-bezier(0.4, 0, 0.2, 1)}
+.brow .v{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+
+.stack{display:flex;height:26px;border-radius:7px;overflow:hidden;background:var(--line)}
+.stack span{display:flex;align-items:center;justify-content:center;color:#fff;font-size:0.78rem;font-weight:700}
+.drow{display:grid;grid-template-columns:140px 1fr;gap:14px;align-items:center;margin:10px 0}
+.legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:14px;font-size:0.86rem;color:var(--mute)}
+.legend b{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.footer-note{border-left:4px solid #3b82f6;background:rgba(59,130,246,0.07);padding:14px 18px;border-radius:8px;font-size:0.9rem;margin-top:24px}
+</style>
+</head>
+<body>
+<main>
+  <div class="header">
+    <span class="badge">Simulasi Komputasi Awan (SOKA)</span>
+    <h1>Benchmarking Penjadwalan Task: BFO vs VNS</h1>
+    <p class="sub" id="sub">Memuat ringkasan benchmark...</p>
+  </div>
+
+  <div class="verdict-box">
+    <div class="verdict-title">Rangkuman Kinerja Komparatif</div>
+    <p class="verdict-text" id="verdict">Menganalisis hasil...</p>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card" id="card-ms">
+      <div class="kpi-label">Makespan Tercepat</div>
+      <div class="kpi-value" id="kpi-ms">-</div>
+      <div class="kpi-sub"><span class="pill" id="kpi-ms-algo">-</span> efisiensi waktu penyelesaian</div>
+    </div>
+    <div class="kpi-card" id="card-di">
+      <div class="kpi-label">Degree of Imbalance (DI)</div>
+      <div class="kpi-value" id="kpi-di">-</div>
+      <div class="kpi-sub"><span class="pill" id="kpi-di-algo">-</span> beban paling seimbang</div>
+    </div>
+    <div class="kpi-card" id="card-wait">
+      <div class="kpi-label">Avg Waiting Time</div>
+      <div class="kpi-value" id="kpi-wait">-</div>
+      <div class="kpi-sub"><span class="pill" id="kpi-wait-algo">-</span> antrian worker terendah</div>
+    </div>
+    <div class="kpi-card" id="card-tp">
+      <div class="kpi-label">Throughput Maksimum</div>
+      <div class="kpi-value" id="kpi-tp">-</div>
+      <div class="kpi-sub"><span class="pill" id="kpi-tp-algo">-</span> produktivitas task/s tertinggi</div>
+    </div>
+  </div>
+
+  <div class="chips" id="chips" role="group" aria-label="Filter algoritma"></div>
+
+  <!-- Panel 1: Latensi Task -->
+  <section class="panel">
+    <div class="head">
+      <h2>Latensi Waktu Eksekusi Tiap Task (Workload Heterogen)</h2>
+      <span class="note" id="tnote">Task 1 (100) s.d. Task 10 (1000)</span>
+    </div>
+    <div class="chart" id="c1"></div>
+    <p class="note" style="margin-top:8px">Menampilkan waktu penyelesaian end-to-end task individual dengan skala beban bertingkat kelipatan 100.</p>
+  </section>
+
+  <!-- Panel 2: Hasil per Run -->
+  <section class="panel">
+    <div class="head">
+      <h2>Konsistensi Performa Antar-Run</h2>
+      <div class="seg" role="group" aria-label="Metrik">
+        <button id="m1" aria-pressed="true">Makespan (detik)</button>
+        <button id="m2" aria-pressed="false">Throughput (task/s)</button>
+      </div>
+    </div>
+    <div class="chart" id="c2"></div>
+  </section>
+
+  <!-- Panel 3: Dua Metrik Kunci -->
+  <section class="panel">
+    <div class="two">
+      <div>
+        <div class="head">
+          <h2>Degree of Imbalance (DI)</h2>
+          <span class="note">Makin kecil = makin seimbang</span>
+        </div>
+        <div id="b1"></div>
+      </div>
+      <div>
+        <div class="head">
+          <h2>Average Waiting Time</h2>
+          <span class="note">Makin kecil = antrian makin singkat</span>
+        </div>
+        <div id="b2"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Panel 4: Tabel 5 Metrik Lengkap -->
+  <section class="panel">
+    <div class="head">
+      <h2>Tabel Komprehensif Evaluasi 5 Metrik</h2>
+      <span class="note">Klik judul kolom untuk menyortir urutan</span>
+    </div>
+    <div class="wrap"><table id="tbl"></table></div>
+  </section>
+
+  <!-- Panel 5: Distribusi Task per Worker -->
+  <section class="panel">
+    <div class="head">
+      <h2>Distribusi Alokasi Task ke Simpul Worker</h2>
+      <span class="note">Total akumulasi pembagian task dari seluruh run</span>
+    </div>
+    <div id="dist"></div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <div class="footer-note">
+    <strong>Catatan Metrik:</strong> Evaluasi menggunakan dataset heterogen kelipatan 100 (100–1.000 unit komputasi) pada 4 node worker. BFO unggul signifikan dalam <em>load balancing</em> (Degree of Imbalance rendah), sementara VNS unggul dalam efisiensi <em>Makespan</em> dan <em>Throughput</em>.
+  </div>
+</main>
+
+<script>
+/*DATA*/
+const DATA = {"meta": {"tasks": 10, "runs": 3, "taskLabel": "rata-rata semua run"}, "metrics": [{"algorithm": "bfo", "runs": 3, "tasks": 10, "makespan_s": 0.4144, "waiting_time_s": 0.0695, "exec_time_s": 0.245, "throughput": 24.5066, "degree_of_imbalance": 0.4253, "completed": 10.0}, {"algorithm": "vns", "runs": 3, "tasks": 10, "makespan_s": 0.4528, "waiting_time_s": 0.0777, "exec_time_s": 0.2749, "throughput": 22.1797, "degree_of_imbalance": 0.341, "completed": 10.0}], "runs": {"bfo": [0.3448, 0.4496, 0.4489], "vns": [0.427, 0.4363, 0.495]}, "tasks": {"bfo": [0.13, 0.238, 0.2426, 0.326, 0.3094, 0.3644, 0.3824, 0.3728, 0.3872, 0.3923], "vns": [0.2066, 0.2633, 0.313, 0.318, 0.3298, 0.3839, 0.4087, 0.4288, 0.4359, 0.4378]}, "dist": {"bfo": {"worker-3": 9, "worker-2": 7, "worker-1": 8, "worker-4": 6}, "vns": {"worker-2": 8, "worker-4": 10, "worker-1": 6, "worker-3": 6}}};
+/*END*/
+
+const N = {
+  bfo: "Bacterial Foraging (BFO)",
+  vns: "Variable Neighborhood (VNS)"
+};
+const C = {
+  bfo: "#10b981",
+  vns: "#3b82f6"
+};
+
+const $ = id => document.getElementById(id);
+const D = DATA.metrics;
+const K = Object.keys(N).filter(k => D.some(d => d.algorithm.toLowerCase() === k));
+const on = new Set(K);
+const f = (v, n = 4) => Number(v).toFixed(n).replace(".", ",");
+const row = a => D.find(d => d.algorithm.toLowerCase() === a);
+
+// Inisialisasi Teks & KPI
+$("sub").textContent = `${DATA.meta.tasks} task heterogen (100 - 1.000 unit), ${DATA.meta.runs} pengulangan run, 4 worker node`;
+
+const bfoData = row("bfo") || D[0];
+const vnsData = row("vns") || D[1];
+
+if (bfoData && vnsData) {
+  const faster = bfoData.makespan_s <= vnsData.makespan_s ? bfoData : vnsData;
+  const slower = faster === bfoData ? vnsData : bfoData;
+  const balanced = bfoData.degree_of_imbalance <= vnsData.degree_of_imbalance ? bfoData : vnsData;
+  const imbalanced = balanced === bfoData ? vnsData : bfoData;
+  const minWait = bfoData.waiting_time_s <= vnsData.waiting_time_s ? bfoData : vnsData;
+  const maxTp = bfoData.throughput >= vnsData.throughput ? bfoData : vnsData;
+
+  const setPill = (id, cardId, algo) => {
+    const el = $(id);
+    el.textContent = algo.toUpperCase();
+    el.className = `pill ${algo.toLowerCase() === 'bfo' ? 'pill-bfo' : 'pill-vns'}`;
+    const card = $(cardId);
+    card.className = `kpi-card ${algo.toLowerCase() === 'bfo' ? 'bfo-lead' : 'vns-lead'}`;
+  };
+
+  $("kpi-ms").textContent = f(faster.makespan_s, 4) + " s";
+  setPill("kpi-ms-algo", "card-ms", faster.algorithm);
+
+  $("kpi-di").textContent = f(balanced.degree_of_imbalance, 4);
+  setPill("kpi-di-algo", "card-di", balanced.algorithm);
+
+  $("kpi-wait").textContent = f(minWait.waiting_time_s, 4) + " s";
+  setPill("kpi-wait-algo", "card-wait", minWait.algorithm);
+
+  $("kpi-tp").textContent = f(maxTp.throughput, 2) + " task/s";
+  setPill("kpi-tp-algo", "card-tp", maxTp.algorithm);
+
+  const msDiff = ((slower.makespan_s - faster.makespan_s) / slower.makespan_s * 100).toFixed(1);
+  const diDiff = ((imbalanced.degree_of_imbalance - balanced.degree_of_imbalance) / imbalanced.degree_of_imbalance * 100).toFixed(1);
+
+  if (faster === balanced) {
+    $("verdict").innerHTML = `<strong>${N[faster.algorithm]}</strong> mendominasi seluruh metrik dengan Makespan tercepat <strong>${f(faster.makespan_s, 4)} s</strong> (${msDiff}% lebih cepat) dan Degree of Imbalance paling seimbang <strong>${f(balanced.degree_of_imbalance, 4)}</strong>.`;
+  } else {
+    $("verdict").innerHTML = `<strong>${N[faster.algorithm]}</strong> unggul pada efisiensi waktu dengan Makespan tercepat <strong>${f(faster.makespan_s, 4)} s</strong> (${msDiff}% lebih cepat dari ${N[slower.algorithm]}), sedangkan <strong>${N[balanced.algorithm]}</strong> unggul pada pemerataan beban dengan Degree of Imbalance <strong>${f(balanced.degree_of_imbalance, 4)}</strong> (${diDiff}% lebih merata).`;
+  }
+}
+
+// Chips Toggle
+K.forEach(a => {
+  const b = document.createElement("button");
+  b.className = "chip";
+  b.style.setProperty("--c", C[a]);
+  b.setAttribute("aria-pressed", "true");
+  b.innerHTML = "<i></i>" + N[a];
+  b.onclick = () => {
+    on.has(a) ? on.delete(a) : on.add(a);
+    b.setAttribute("aria-pressed", on.has(a));
+    renderAll(false);
+  };
+  $("chips").appendChild(b);
+});
+
+// Diagram Batang Berkelompok SVG
+function line(el, series, xl, fmt, yTitle, anim) {
+  const W = 780, H = 300, m = { l: 56, r: 16, t: 20, b: 36 };
+  el.innerHTML = "";
+  if (!series.length) {
+    el.innerHTML = '<p class="note" style="padding:40px 0;text-align:center">Pilih minimal satu algoritma di atas.</p>';
+    return;
+  }
+  const maxRaw = Math.max(...series.flatMap(s => s.v));
+  const hi = (maxRaw * 1.25) || 1.0;
+  const n = xl.length;
+  const gw = (W - m.l - m.r) / n;
+  const bw = Math.min(32, gw * 0.75 / series.length);
+  const Y = v => H - m.b - (v / hi) * (H - m.t - m.b);
+
+  let g = "";
+  for (let i = 0; i <= 4; i++) {
+    const v = hi * i / 4;
+    const y = Y(v);
+    g += `<line class="gl" x1="${m.l}" x2="${W - m.r}" y1="${y}" y2="${y}"/><text class="ax" x="${m.l - 10}" y="${y + 4}" text-anchor="end">${f(v, 2)}</text>`;
+  }
+  g += `<text class="ax" x="${m.l}" y="${m.t - 8}" font-weight="600">${yTitle}</text><rect id="hl" y="${m.t}" height="${H - m.t - m.b}" width="${gw}" fill="var(--mute)" opacity="0"/>`;
+
+  xl.forEach((t, i) => {
+    g += `<text class="ax" x="${m.l + gw * (i + 0.5)}" y="${H - 12}" text-anchor="middle">${t}</text>`;
+  });
+
+  series.forEach((s, j) => s.v.forEach((v, i) => {
+    const x = m.l + i * gw + (gw - bw * series.length) / 2 + j * bw;
+    const y = Y(v);
+    g += `<rect class="${anim ? "grow" : ""}" x="${x}" y="${y}" width="${Math.max(bw - 2, 3)}" height="${H - m.b - y}" rx="3" fill="${s.c}"/>`;
+  }));
+
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Diagram batang ${yTitle}">${g}<rect x="${m.l}" y="0" width="${W - m.l - m.r}" height="${H}" fill="transparent" id="hit"/></svg><div class="tip"></div>`;
+
+  const tip = el.querySelector(".tip"), hl = el.querySelector("#hl"), svg = el.querySelector("svg");
+  const move = e => {
+    const r = svg.getBoundingClientRect();
+    const px = (e.clientX - r.left) / r.width * W;
+    const i = Math.max(0, Math.min(n - 1, Math.floor((px - m.l) / gw)));
+    hl.setAttribute("x", m.l + i * gw);
+    hl.setAttribute("opacity", 0.08);
+    tip.innerHTML = `<b>${xl[i]}</b>` + [...series].sort((a, b) => a.v[i] - b.v[i]).map(s => `<span><i style="background:${s.c}"></i>${N[s.k] || s.k}: ${fmt(s.v[i])}</span>`).join("");
+    tip.style.opacity = 1;
+    const tx = (m.l + gw * (i + 0.5)) / W * r.width;
+    tip.style.left = Math.max(8, Math.min(tx + 12, r.width - tip.offsetWidth - 8)) + "px";
+    tip.style.top = "12px";
+  };
+  const hit = el.querySelector("#hit");
+  hit.onpointermove = move;
+  hit.onpointerleave = () => { tip.style.opacity = 0; hl.setAttribute("opacity", 0); };
+}
+
+// Side Bar Visualizer
+function bars(el, key, fmt, lowerIsBetter) {
+  el.innerHTML = "";
+  const A = K.filter(k => on.has(k));
+  if (!A.length) { el.innerHTML = '<p class="note">Pilih minimal satu algoritma.</p>'; return; }
+  const values = A.map(k => row(k)[key]);
+  const mx = Math.max(...values) * 1.15 || 1.0;
+  const bestVal = lowerIsBetter ? Math.min(...values) : Math.max(...values);
+
+  A.forEach(k => {
+    const r = document.createElement("div");
+    const v = row(k)[key];
+    r.className = "brow";
+    const isBest = v === bestVal;
+    r.innerHTML = `<div><strong>${N[k]}</strong></div><div class="bar"><i></i></div><div class="v" style="${isBest ? 'color:#059669' : ''}">${fmt(v)}${isBest ? ' ✓' : ''}</div>`;
+    el.appendChild(r);
+    const i = r.querySelector("i");
+    i.style.background = C[k];
+    requestAnimationFrame(() => i.style.width = ((v / mx) * 100) + "%");
+  });
+}
+
+let metric = "makespan";
+function renderAll(anim) {
+  const A = K.filter(k => on.has(k));
+  bars($("b1"), "degree_of_imbalance", v => f(v, 4), true);
+  bars($("b2"), "waiting_time_s", v => f(v, 4) + " s", true);
+
+  // Latensi per Task (Kelipatan 100)
+  const taskLabels = Array.from({ length: DATA.meta.tasks }, (_, i) => `T${i+1} (${(i+1)*100})`);
+  line($("c1"), A.filter(k => DATA.tasks[k]).map(k => ({ k, c: C[k], v: DATA.tasks[k] })), taskLabels, v => f(v, 4) + " s", "detik", anim);
+
+  // Konsistensi Run
+  const rn = DATA.runs;
+  const nr = Math.max(...K.map(k => rn[k] ? rn[k].length : 0));
+  line($("c2"), A.map(k => ({
+    k,
+    c: C[k],
+    v: metric === "makespan" ? rn[k] : rn[k].map(x => DATA.meta.tasks / x)
+  })), Array.from({ length: nr }, (_, i) => "Run " + (i + 1)), v => f(v, 4) + (metric === "makespan" ? " s" : " task/s"), metric === "makespan" ? "detik" : "task/detik", anim);
+}
+
+[["m1", "makespan"], ["m2", "throughput"]].forEach(([id, m]) => $(id).onclick = () => {
+  metric = m;
+  $("m1").setAttribute("aria-pressed", m === "makespan");
+  $("m2").setAttribute("aria-pressed", m === "throughput");
+  renderAll(true);
+});
+
+// Tabel 5 Metrik
+const cols = [
+  ["algorithm", "Algoritma", null, 0],
+  ["makespan_s", "Makespan (s)", true, 4],
+  ["waiting_time_s", "Waiting Time (s)", true, 4],
+  ["exec_time_s", "Execution Time (s)", true, 4],
+  ["throughput", "Throughput (task/s)", false, 2],
+  ["degree_of_imbalance", "Degree of Imbalance (DI)", true, 4]
+];
+
+let sk = "makespan_s", asc = true;
+function table() {
+  const rows = [...D].sort((a, b) => {
+    if (sk === "algorithm") {
+      return (asc ? 1 : -1) * (N[a.algorithm] || a.algorithm).localeCompare(N[b.algorithm] || b.algorithm);
+    }
+    return (asc ? 1 : -1) * (a[sk] - b[sk]);
+  });
+
+  const best = {};
+  cols.slice(1).forEach(([k, , low]) => {
+    best[k] = D.reduce((a, b) => (low ? b[k] < a[k] : b[k] > a[k]) ? b : a).algorithm;
+  });
+
+  $("tbl").innerHTML = "<thead><tr>" + cols.map(([k, t]) => `<th><button data-k="${k}">${t}${k === sk ? (asc ? " ▲" : " ▼") : ""}</button></th>`).join("") + "</tr></thead>" +
+    "<tbody>" + rows.map(r => `<tr><td><span class="dot" style="background:${C[r.algorithm]}"></span><strong>${N[r.algorithm] || r.algorithm.toUpperCase()}</strong></td>` +
+      cols.slice(1).map(([k, , , d]) => `<td class="${best[k] === r.algorithm ? "best" : ""}">${f(r[k], d)}</td>`).join("") +
+    "</tr>").join("") + "</tbody>";
+
+  $("tbl").querySelectorAll("button").forEach(b => b.onclick = () => {
+    const k = b.dataset.k;
+    asc = k === sk ? !asc : true;
+    sk = k;
+    table();
+  });
+}
+
+// Distribusi Worker
+const WC = { "worker-1": "#0ea5e9", "worker-2": "#f59e0b", "worker-3": "#8b5cf6", "worker-4": "#ec4899" };
+K.forEach(a => {
+  if (!DATA.dist[a]) return;
+  const r = document.createElement("div");
+  r.className = "drow";
+  r.innerHTML = `<div><strong>${N[a]}</strong></div><div class="stack"></div>`;
+  const total = Object.values(DATA.dist[a]).reduce((x, y) => x + y, 0);
+  Object.entries(DATA.dist[a]).sort().forEach(([w, n]) => {
+    const s = document.createElement("span");
+    s.style.flex = n;
+    s.style.background = WC[w] || "#64748b";
+    s.textContent = `${w}: ${n} task (${Math.round(n/total*100)}%)`;
+    r.children[1].appendChild(s);
+  });
+  $("dist").appendChild(r);
+});
+
+Object.entries(WC).forEach(([w, c]) => {
+  const s = document.createElement("span");
+  s.innerHTML = `<b style="background:${c}"></b>${w}`;
+  $("legend").appendChild(s);
+});
+
+table();
+renderAll(true);
+</script>
+</body>
+</html>
